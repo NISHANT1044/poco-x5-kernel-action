@@ -168,6 +168,115 @@ ksu_install() {
 	fi
 	ok "${name} installed at ${head_desc} (${head_sha})"
 
+	if [ -f "${ksu_dir}/kernel/ksud.c" ]; then
+		info "Ensuring manual hook symbols (ksu_vfs_read_hook, etc.) are always exported in ksud.c"
+		python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+
+c = c.replace(
+"""#ifdef CONFIG_KPROBES
+static struct work_struct stop_vfs_read_work;
+static struct work_struct stop_execve_hook_work;
+static struct work_struct stop_input_hook_work;
+#else
+bool ksu_vfs_read_hook __read_mostly = true;
+bool ksu_execveat_hook __read_mostly = true;
+bool ksu_input_hook __read_mostly = true;
+#endif""",
+"""#ifdef CONFIG_KPROBES
+static struct work_struct stop_vfs_read_work;
+static struct work_struct stop_execve_hook_work;
+static struct work_struct stop_input_hook_work;
+#endif
+bool ksu_vfs_read_hook __read_mostly = true;
+bool ksu_execveat_hook __read_mostly = true;
+bool ksu_input_hook __read_mostly = true;"""
+)
+
+c = c.replace(
+"""static void stop_vfs_read_hook()
+{
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_vfs_read_work);
+	pr_info("unregister vfs_read kprobe: %d!\\n", ret);
+#else
+	ksu_vfs_read_hook = false;
+	pr_info("stop vfs_read_hook\\n");
+#endif
+}""",
+"""static void stop_vfs_read_hook()
+{
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_vfs_read_work);
+	pr_info("unregister vfs_read kprobe: %d!\\n", ret);
+#endif
+	ksu_vfs_read_hook = false;
+	pr_info("stop vfs_read_hook\\n");
+}"""
+)
+
+c = c.replace(
+"""static void stop_execve_hook()
+{
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_execve_hook_work);
+	pr_info("unregister execve kprobe: %d!\\n", ret);
+#else
+	ksu_execveat_hook = false;
+	pr_info("stop execve_hook\\n");
+#endif
+}""",
+"""static void stop_execve_hook()
+{
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_execve_hook_work);
+	pr_info("unregister execve kprobe: %d!\\n", ret);
+#endif
+	ksu_execveat_hook = false;
+	pr_info("stop execve_hook\\n");
+}"""
+)
+
+c = c.replace(
+"""static void stop_input_hook()
+{
+	static bool input_hook_stopped = false;
+	if (input_hook_stopped) {
+		return;
+	}
+	input_hook_stopped = true;
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_input_hook_work);
+	pr_info("unregister input kprobe: %d!\\n", ret);
+#else
+	ksu_input_hook = false;
+	pr_info("stop input_hook\\n");
+#endif
+}""",
+"""static void stop_input_hook()
+{
+	static bool input_hook_stopped = false;
+	if (input_hook_stopped) {
+		return;
+	}
+	input_hook_stopped = true;
+#ifdef CONFIG_KPROBES
+	bool ret = schedule_work(&stop_input_hook_work);
+	pr_info("unregister input kprobe: %d!\\n", ret);
+#endif
+	ksu_input_hook = false;
+	pr_info("stop input_hook\\n");
+}"""
+)
+
+with open(p, "w") as f:
+    f.write(c)
+' "${ksu_dir}/kernel/ksud.c"
+	fi
+
 	# --- publish facts the later steps need --------------------------------
 	local count version_label
 	count=$(git -C "$ksu_dir" rev-list --count HEAD 2>/dev/null || echo 0)
