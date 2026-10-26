@@ -30,6 +30,23 @@ if [ -f "${KERNEL_DIR}/include/linux/typecheck.h" ]; then
 	sed -i 's/__dummy2 = {};/__dummy2;/g' "${KERNEL_DIR}/include/linux/typecheck.h"
 fi
 
+if [ -f "${KERNEL_DIR}/fs/exec.c" ]; then
+	info "Adding fallback weak stub for ksu_handle_post_execveat in fs/exec.c"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+target = "extern int ksu_handle_post_execveat(int *fd, struct filename **filename_ptr,\n\t\t\t\tvoid *argv, void *envp, int *flags, int *retval);"
+sub = "int __attribute__((weak)) ksu_handle_post_execveat(int *fd, struct filename **filename_ptr,\n\t\t\t\tvoid *argv, void *envp, int *flags, int *retval) { return 0; }"
+if target in c:
+    c = c.replace(target, sub)
+    print("Patched ksu_handle_post_execveat in fs/exec.c")
+with open(p, "w") as f:
+    f.write(c)
+' "${KERNEL_DIR}/fs/exec.c"
+fi
+
 if [ -d "${KERNEL_DIR}/techpack/display" ] && [ -d "${KERNEL_DIR}/techpack/dataipa" ]; then
 	info "techpack/display and dataipa already present in stone kernel source; keeping native techpack"
 else
