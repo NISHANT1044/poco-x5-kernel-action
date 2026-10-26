@@ -78,34 +78,23 @@ susfs_apply() {
 		[ -f "$kernel_patch" ] || {
 			kernel_patch=$(find "$kp" -maxdepth 1 -name '50_add_susfs_in_*.patch' | head -n1)
 		}
-	else
-		info "Using pre-verified Xiaomi SuSFS patch from patches/50_add_susfs_in_kernel-5.4.patch"
-	fi
-	[ -n "$kernel_patch" ] && [ -f "$kernel_patch" ] \
-		|| die "no 50_add_susfs_in_*.patch found in ${kp}"
-
-		# Adapt SUSFS 5.4 patch for Xiaomi Qualcomm 5.4 tree (bootconfig, mount.h, task_mmu.c, fd.c)
-		info "Adapting SUSFS 5.4 patch for Xiaomi kernel tree"
+		[ -n "$kernel_patch" ] && [ -f "$kernel_patch" ] \
+			|| die "no 50_add_susfs_in_*.patch found in ${kp}"
+		info "Adapting upstream SUSFS 5.4 patch for Xiaomi kernel tree"
 		python3 -c "
 import re, sys
 p = open(sys.argv[1]).read()
-
-# 1. Remove bootconfig if not present
 p = re.sub(r'diff --git a/fs/proc/bootconfig\\.c b/fs/proc/bootconfig\\.c.*?(?=diff --git|\\Z)', '', p, flags=re.DOTALL)
-
-# 2. Fix include/linux/mount.h for Xiaomi void *data
 p = p.replace('#endif\n } __randomize_layout;', '#endif\n\tvoid *data;\n } __randomize_layout;')
-
-# 3. Fix fs/proc/task_mmu.c for Xiaomi extra includes
 p = p.replace('#include <linux/pkeys.h>\n+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT', '#include <linux/pkeys.h>\n #include <linux/mm_inline.h>\n #include <linux/ctype.h>\n+#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT')
-
-# 4. Fix fs/proc/fd.c for Xiaomi seq_printf format (no ino in stock)
 p = p.replace('mnt_id:%i\\nino:%lu\\n', 'mnt_id:%i\\n')
 p = p.replace('mnt_id:\\t%i\\nino:\\t%lu\\n', 'mnt_id:\\t%i\\n')
-p = p.replace('real_mount(file->f_path.mnt)->mnt_id,\n-		   file_inode(file)->i_ino);', 'real_mount(file->f_path.mnt)->mnt_id);')
-
+p = p.replace('real_mount(file->f_path.mnt)->mnt_id,\n-\t\t   file_inode(file)->i_ino);', 'real_mount(file->f_path.mnt)->mnt_id);')
 open(sys.argv[1], 'w').write(p)
-" "$kernel_patch" 
+" "$kernel_patch"
+	else
+		info "Using pre-verified Xiaomi SuSFS patch from patches/50_add_susfs_in_kernel-5.4.patch"
+	fi
 
 	( cd "$KERNEL_DIR" && apply_patch "$kernel_patch" 1 ) \
 		|| die "the SUSFS kernel patch did not apply cleanly.

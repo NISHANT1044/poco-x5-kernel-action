@@ -24,14 +24,18 @@ if [ -f "${KERNEL_DIR}/.git/shallow" ]; then
 	debug "kernel tree is shallow; that is fine for building"
 fi
 
-group "Injecting AMOLED display techpack"
-info "Fetching techpack/display from Fucking-Projekt meme branch..."
-git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/display_src"
-rm -rf "${KERNEL_DIR}/techpack/display"
-cp -r "${WORKSPACE}/display_src/techpack/display" "${KERNEL_DIR}/techpack/"
-rm -rf "${WORKSPACE}/display_src"
+if [ -d "${KERNEL_DIR}/techpack/display" ] && [ -d "${KERNEL_DIR}/techpack/dataipa" ]; then
+	info "techpack/display and dataipa already present in stone kernel source; keeping native techpack"
+else
+	group "Injecting AMOLED display techpack"
+	info "Fetching techpack/display from Fucking-Projekt meme branch..."
+	git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/display_src"
+	rm -rf "${KERNEL_DIR}/techpack/display"
+	cp -r "${WORKSPACE}/display_src/techpack/display" "${KERNEL_DIR}/techpack/"
+	rm -rf "${WORKSPACE}/display_src"
+fi
 
-if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ]; then
+if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ] && [ ! -d "${KERNEL_DIR}/techpack/dataipa" ]; then
 	info "Restoring stock CodeLinaro msm_atomic.c and msm_kms.h (pre-c7dd4e53)"
 	cp -v "${REPO_ROOT}/patches/display/msm_atomic.c" "${KERNEL_DIR}/techpack/display/msm/msm_atomic.c"
 	cp -v "${REPO_ROOT}/patches/display/msm_kms.h"    "${KERNEL_DIR}/techpack/display/msm/msm_kms.h"
@@ -45,13 +49,14 @@ if [ -f "${KERNEL_DIR}/techpack/display/msm/msm_drv.c" ]; then
 	sed -i 's/kthread_run_perf_critical(cpu_perf_mask,/kthread_run(/g' "${KERNEL_DIR}/techpack/display/msm/msm_drv.c"
 fi
 if [ -f "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c" ]; then
-	info "Fixing of_graph_is_present for Linux 5.4 in dsi_display.c"
+	info "Checking of_graph_is_present for Linux 5.4 in dsi_display.c"
 	python3 -c '
 import sys
 p = sys.argv[1]
 with open(p, "r") as f:
     c = f.read()
-patch = """#include <linux/of_graph.h>
+if "of_graph_is_present" not in c:
+    patch = """#include <linux/of_graph.h>
 static inline bool of_graph_is_present(const struct device_node *node) {
 \tstruct device_node *ports, *port;
 \tports = of_get_child_by_name(node, "ports");
@@ -62,9 +67,9 @@ static inline bool of_graph_is_present(const struct device_node *node) {
 \treturn !!port;
 }
 """
-c = c.replace("#include <linux/err.h>", "#include <linux/err.h>\n" + patch)
-with open(p, "w") as f:
-    f.write(c)
+    c = c.replace("#include <linux/err.h>", "#include <linux/err.h>\n" + patch)
+    with open(p, "w") as f:
+        f.write(c)
 ' "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c"
 fi
 
