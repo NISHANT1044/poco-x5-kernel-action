@@ -117,9 +117,9 @@ build_kernel() {
 	group "Building kernel"
 	export PATH="${CLANG_PATH:-}:${PATH}"
 	if [ -f "${KERNEL_DIR}/drivers/usb/typec/tcpc/Makefile" ]; then
-		info "Fixing tcpc Makefile for Clang 14"
+		info "Fixing tcpc Makefile warnings"
 		sed -i 's/ -Werror//g' "${KERNEL_DIR}/drivers/usb/typec/tcpc/Makefile"
-		printf '\nsubdir-ccflags-y += -Wno-unused-but-set-variable -Wno-unused-variable\n' >> "${KERNEL_DIR}/drivers/usb/typec/tcpc/Makefile"
+		printf '\nsubdir-ccflags-y += -Wno-error -Wno-unused-variable\n' >> "${KERNEL_DIR}/drivers/usb/typec/tcpc/Makefile"
 	fi
 	if [ -f "${KERNEL_DIR}/drivers/kernelsu/kernel_includes.h" ]; then
 		info "Fixing static_call.h inclusion for kernel 5.4 in kernel_includes.h"
