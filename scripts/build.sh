@@ -20,16 +20,15 @@ DEFCONFIG_PATH="${KERNEL_DIR}/arch/${ARCH}/configs/${KERNEL_CONFIG}"
 
 prepare_defconfig() {
 	group "Preparing defconfig"
-	if [ ! -f "$DEFCONFIG_PATH" ]; then
-		if [ -f "${WORKSPACE}/../configs/${KERNEL_CONFIG}" ]; then
-			cp "${WORKSPACE}/../configs/${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
-		elif [ -f "${WORKSPACE}/../${KERNEL_CONFIG}" ]; then
-			cp "${WORKSPACE}/../${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
-		elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "${GITHUB_WORKSPACE}/configs/${KERNEL_CONFIG}" ]; then
-			cp "${GITHUB_WORKSPACE}/configs/${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
-		elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "${GITHUB_WORKSPACE}/${KERNEL_CONFIG}" ]; then
-			cp "${GITHUB_WORKSPACE}/${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
-		fi
+	if [ -f "${WORKSPACE}/../${KERNEL_CONFIG}" ]; then
+		info "Copying repository ${KERNEL_CONFIG} to $DEFCONFIG_PATH"
+		cp -f "${WORKSPACE}/../${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
+	elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "${GITHUB_WORKSPACE}/${KERNEL_CONFIG}" ]; then
+		info "Copying GITHUB_WORKSPACE ${KERNEL_CONFIG} to $DEFCONFIG_PATH"
+		cp -f "${GITHUB_WORKSPACE}/${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
+	elif [ -f "${WORKSPACE}/../configs/${KERNEL_CONFIG}" ]; then
+		info "Copying configs/${KERNEL_CONFIG} to $DEFCONFIG_PATH"
+		cp -f "${WORKSPACE}/../configs/${KERNEL_CONFIG}" "$DEFCONFIG_PATH"
 	fi
 	[ -f "$DEFCONFIG_PATH" ] \
 		|| die "defconfig not found: arch/${ARCH}/configs/${KERNEL_CONFIG}
