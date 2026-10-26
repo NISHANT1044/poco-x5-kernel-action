@@ -24,6 +24,12 @@ if [ -f "${KERNEL_DIR}/.git/shallow" ]; then
 	debug "kernel tree is shallow; that is fine for building"
 fi
 
+if [ -f "${KERNEL_DIR}/include/linux/typecheck.h" ]; then
+	info "Fixing scalar initializer in include/linux/typecheck.h for Clang"
+	sed -i 's/__dummy = {};/__dummy;/g' "${KERNEL_DIR}/include/linux/typecheck.h"
+	sed -i 's/__dummy2 = {};/__dummy2;/g' "${KERNEL_DIR}/include/linux/typecheck.h"
+fi
+
 if [ -d "${KERNEL_DIR}/techpack/display" ] && [ -d "${KERNEL_DIR}/techpack/dataipa" ]; then
 	info "techpack/display and dataipa already present in stone kernel source; keeping native techpack"
 else
