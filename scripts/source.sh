@@ -71,6 +71,64 @@ with open(p, "w") as f:
 ' "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c"
 fi
 
+# ==============================================================================
+# Allow ALL stock Xiaomi DLKM vendor modules (Camera, WiFi, BT, Audio, Sensors)
+# ==============================================================================
+if [ -f "${KERNEL_DIR}/kernel/module.c" ]; then
+	info "Patching kernel/module.c to unconditionally accept all Xiaomi vendor modules..."
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+
+# 1. Accept vermagic even if different
+old_magic = """} else if (!same_magic(modmagic, vermagic, info->index.vers)) {
+\t\tpr_err("%s: version magic '%s' should be '%s'\\n",
+\t\t       info->name, modmagic, vermagic);
+\t\treturn -ENOEXEC;
+\t}"""
+
+new_magic = """} else if (!same_magic(modmagic, vermagic, info->index.vers)) {
+\t\tpr_warn("%s: version magic '%s' should be '%s', accepting anyway\\n",
+\t\t       info->name, modmagic, vermagic);
+\t}"""
+
+if old_magic in c:
+    c = c.replace(old_magic, new_magic)
+    print("Patched same_magic in module.c")
+
+# 2. Accept all symbol CRCs
+old_check_ver = """static int check_version(const struct load_info *info,
+\t\t\t const char *symname,
+\t\t\t struct module *mod,
+\t\t\t const s32 *crc)
+{"""
+
+new_check_ver = """static int check_version(const struct load_info *info,
+\t\t\t const char *symname,
+\t\t\t struct module *mod,
+\t\t\t const s32 *crc)
+{
+\treturn 1;"""
+
+if old_check_ver in c:
+    c = c.replace(old_check_ver, new_check_ver)
+    print("Patched check_version in module.c")
+
+with open(p, "w") as f:
+    f.write(c)
+' "${KERNEL_DIR}/kernel/module.c"
+fi
+
+if [ -f "${KERNEL_DIR}/scripts/setlocalversion" ]; then
+	info "Fixing setlocalversion to prevent git commit hash and -dirty from corrupting vermagic"
+	echo "#!/bin/sh" > "${KERNEL_DIR}/scripts/setlocalversion"
+	echo 'echo ""' >> "${KERNEL_DIR}/scripts/setlocalversion"
+	chmod +x "${KERNEL_DIR}/scripts/setlocalversion"
+fi
+
+
 ok "AMOLED display techpack injected into ${KERNEL_DIR}/techpack/display"
 endgroup
 
