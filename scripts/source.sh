@@ -114,25 +114,23 @@ fi
 if [ -f "${KERNEL_DIR}/kernel/module.c" ]; then
 	info "Patching kernel/module.c to unconditionally accept all Xiaomi vendor modules..."
 	python3 -c '
-import sys, re
+import sys
 p = sys.argv[1]
 with open(p, "r") as f:
     c = f.read()
 
-# Make same_magic always return 1
-c = re.sub(
-    r"static inline int same_magic\([^)]+\)\s*\{[^}]+\}",
-    "static inline int same_magic(const char *amagic, const char *bmagic, bool has_crcs) {\n\treturn 1;\n}",
-    c
-)
+# 1. same_magic returns 1
+c = c.replace("return strcmp(amagic, bmagic) == 0;", "return 1;")
 print("Patched same_magic in module.c")
 
-# Make check_version always return 1
-target_chk = "Elf_Shdr *sechdrs = info->sechdrs;"
-replacement_chk = "return 1;\n\tElf_Shdr *sechdrs = info->sechdrs;"
+# 2. check_version returns 1 cleanly after declarations
+target_chk = "struct modversion_info *versions;"
+replacement_chk = "struct modversion_info *versions;\n\n\treturn 1;"
 if target_chk in c:
     c = c.replace(target_chk, replacement_chk, 1)
     print("Patched check_version in module.c")
+else:
+    print("Warning: target_chk not found in module.c")
 
 with open(p, "w") as f:
     f.write(c)
