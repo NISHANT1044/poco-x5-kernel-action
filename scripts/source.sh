@@ -149,7 +149,7 @@ endgroup
 
 info "Locking kernel version to stock 5.4.289-qgki-g4e27a72000be for HyperOS module compatibility"
 sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 289/' "${KERNEL_DIR}/Makefile"
-sed -i 's/^EXTRAVERSION = .*/EXTRAVERSION = -qgki-g4e27a72000be/' "${KERNEL_DIR}/Makefile"
+sed -i 's/^EXTRAVERSION = .*/EXTRAVERSION =/' "${KERNEL_DIR}/Makefile"
 
 KVER=$(kernel_version "$KERNEL_DIR") \
 	|| die "could not read VERSION/PATCHLEVEL from ${KERNEL_DIR}/Makefile -- is this a kernel tree?"
