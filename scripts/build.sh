@@ -159,6 +159,23 @@ EXPORT_SYMBOL(dsi_display_get_flat_mode);
 
 int __attribute__((weak)) dsi_display_set_flat_mode(void *c, int mode) { return 0; }
 EXPORT_SYMBOL(dsi_display_set_flat_mode);
+
+static char __cdev_tevent_dummy[64];
+
+void * __attribute__((weak)) cdev_tevent_alloc(int type) { return __cdev_tevent_dummy; }
+EXPORT_SYMBOL(cdev_tevent_alloc);
+
+int __attribute__((weak)) cdev_tevent_add_int(void *event, const char *key, int val) { return 0; }
+EXPORT_SYMBOL(cdev_tevent_add_int);
+
+int __attribute__((weak)) cdev_tevent_add_str(void *event, const char *key, const char *val) { return 0; }
+EXPORT_SYMBOL(cdev_tevent_add_str);
+
+int __attribute__((weak)) cdev_tevent_write(void *event) { return 0; }
+EXPORT_SYMBOL(cdev_tevent_write);
+
+void __attribute__((weak)) cdev_tevent_destroy(void *event) { }
+EXPORT_SYMBOL(cdev_tevent_destroy);
 EOF
 	fi
 	export KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-Github-Action}
