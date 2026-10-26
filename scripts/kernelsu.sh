@@ -278,13 +278,17 @@ with open(p, "w") as f:
 	fi
 
 	if [ -f "${ksu_dir}/kernel/selinux/sepolicy.c" ]; then
-		info "Fixing flex_array.h include for kernel >= 5.0 in KernelSU-Next"
+		info "Fixing flex_array.h and avtab access for kernel >= 5.0 in KernelSU-Next"
 		python3 -c '
 import sys
 p = sys.argv[1]
 with open(p, "r") as f:
     c = f.read()
 c = c.replace("#include <linux/flex_array.h>", "#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)\n#include <linux/flex_array.h>\n#endif")
+c = c.replace("flex_array_get_ptr(db->te_avtab.htable, i)", "db->te_avtab.htable[i]")
+c = c.replace("flex_array_put_ptr(db->te_avtab.htable, i, n->next,\n                                   GFP_ATOMIC)", "db->te_avtab.htable[i] = n->next")
+c = c.replace("flex_array_put_ptr(db->te_avtab.htable, i, n->next, GFP_ATOMIC)", "db->te_avtab.htable[i] = n->next")
+c = c.replace("flex_array_put_ptr(removed.htable, 0, n, GFP_ATOMIC | __GFP_ZERO)", "removed.htable[0] = n")
 with open(p, "w") as f:
     f.write(c)
 ' "${ksu_dir}/kernel/selinux/sepolicy.c"
