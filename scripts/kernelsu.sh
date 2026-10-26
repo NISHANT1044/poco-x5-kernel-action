@@ -277,6 +277,19 @@ with open(p, "w") as f:
 ' "${ksu_dir}/kernel/ksud.c"
 	fi
 
+	if [ -f "${ksu_dir}/kernel/selinux/sepolicy.c" ]; then
+		info "Fixing flex_array.h include for kernel >= 5.0 in KernelSU-Next"
+		python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+c = c.replace("#include <linux/flex_array.h>", "#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)\n#include <linux/flex_array.h>\n#endif")
+with open(p, "w") as f:
+    f.write(c)
+' "${ksu_dir}/kernel/selinux/sepolicy.c"
+	fi
+
 	# --- publish facts the later steps need --------------------------------
 	local count version_label
 	count=$(git -C "$ksu_dir" rev-list --count HEAD 2>/dev/null || echo 0)
