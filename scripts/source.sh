@@ -87,6 +87,50 @@ cp -r "${WORKSPACE}/techpack_src/techpack/datarmnet-ext" "${KERNEL_DIR}/techpack
 
 rm -rf "${WORKSPACE}/techpack_src"
 
+if [ -f "${KERNEL_DIR}/include/linux/netdevice.h" ]; then
+	info "Adding dev_set_threaded stub to include/linux/netdevice.h"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+if "dev_set_threaded" not in c:
+    stub = """
+static inline int dev_set_threaded(struct net_device *dev, bool threaded)
+{
+\treturn 0;
+}
+"""
+    c = c.replace("#endif\t/* _LINUX_NETDEVICE_H */", stub + "\n#endif\t/* _LINUX_NETDEVICE_H */")
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched netdevice.h with dev_set_threaded stub")
+' "${KERNEL_DIR}/include/linux/netdevice.h"
+fi
+
+if [ -f "${KERNEL_DIR}/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c" ]; then
+	info "Adding dev_set_threaded fallback in rmnet_ipa.c"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+stub = """
+#ifndef dev_set_threaded
+static inline int dev_set_threaded(struct net_device *dev, bool threaded)
+{
+\treturn 0;
+}
+#endif
+"""
+if "static inline int dev_set_threaded" not in c:
+    c = c.replace("#include <linux/netdevice.h>", "#include <linux/netdevice.h>\n" + stub)
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched rmnet_ipa.c with dev_set_threaded fallback")
+' "${KERNEL_DIR}/techpack/dataipa/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c"
+fi
+
 if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ]; then
 	info "Restoring stock CodeLinaro msm_atomic.c and msm_kms.h (pre-c7dd4e53)"
 	cp -v "${REPO_ROOT}/patches/display/msm_atomic.c" "${KERNEL_DIR}/techpack/display/msm/msm_atomic.c"
