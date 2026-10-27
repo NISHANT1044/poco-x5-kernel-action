@@ -643,7 +643,7 @@ index 6b634c0..1bf6ca5 100644
  
  	task = get_proc_task(m->private);
  	if (!task)
-@@ -54,10 +60,48 @@ static int seq_show(struct seq_file *m, void *v)
+@@ -54,9 +60,21 @@ static int seq_show(struct seq_file *m, void *v)
  	if (ret)
  		return ret;
  
@@ -651,44 +651,17 @@ index 6b634c0..1bf6ca5 100644
 +	mnt = real_mount(file->f_path.mnt);
 +	if (likely(current->susfs_task_state & TASK_STRUCT_NON_ROOT_USER_APP_PROC) &&
 +			mnt->mnt_id >= DEFAULT_SUS_MNT_ID) {
-+		struct path path;
-+		char *pathname = kmalloc(PAGE_SIZE, GFP_KERNEL);
-+		char *dpath;
-+
 +		for (; mnt->mnt_id >= DEFAULT_SUS_MNT_ID; mnt = mnt->mnt_parent) { }
-+
-+		if (!pathname) {
-+			goto out_seq_printf;
-+		}
-+		dpath = d_path(&file->f_path, pathname, PAGE_SIZE);
-+		if (!dpath) {
-+			goto out_free_pathname;
-+		}
-+		if (kern_path(dpath, 0, &path)) {
-+			goto out_free_pathname;
-+		}
-+		seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
++		seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\n",
 +				(long long)file->f_pos, f_flags,
-+				mnt->mnt_id,
-+				path.dentry->d_inode->i_ino);
-+		path_put(&path);
-+		kfree(pathname);
++				mnt->mnt_id);
 +		goto bypass_orig_flow;
-+out_free_pathname:
-+		kfree(pathname);
 +	}
-+out_seq_printf:
-+	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
-+		   (long long)file->f_pos, f_flags,
-+		   mnt->mnt_id,
-+		   file_inode(file)->i_ino);
 +bypass_orig_flow:
-+#else
- 	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\nino:\t%lu\n",
- 		   (long long)file->f_pos, f_flags,
- 		   real_mount(file->f_path.mnt)->mnt_id,
- 		   file_inode(file)->i_ino);
 +#endif
+ 	seq_printf(m, "pos:\t%lli\nflags:\t0%o\nmnt_id:\t%i\n",
+ 		   (long long)file->f_pos, f_flags,
+ 		   real_mount(file->f_path.mnt)->mnt_id);
  
  	show_fd_locks(m, file, files);
  	if (seq_has_overflowed(m))
@@ -1001,7 +974,7 @@ diff --git a/include/linux/sched.h b/include/linux/sched.h
 index 98bf6d0..14acc54 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -1522,6 +1522,10 @@ struct task_struct {
+@@ -1522,5 +1522,9 @@ struct task_struct {
  	ANDROID_KABI_RESERVE(6);
  	ANDROID_KABI_RESERVE(7);
  	ANDROID_KABI_RESERVE(8);
@@ -1009,7 +982,6 @@ index 98bf6d0..14acc54 100644
 +	u64 susfs_task_state;
 +	u64 susfs_last_fake_mnt_id;
 +#endif
- #endif
  
  	/*
 diff --git a/kernel/kallsyms.c b/kernel/kallsyms.c
@@ -1039,7 +1011,7 @@ diff --git a/kernel/sys.c b/kernel/sys.c
 index fac59f3..34ce40c 100644
 --- a/kernel/sys.c
 +++ b/kernel/sys.c
-@@ -1347,6 +1347,9 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
+@@ -1347,5 +1347,8 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
  
  	down_read(&uts_sem);
  	memcpy(&tmp, utsname(), sizeof(tmp));
@@ -1047,8 +1019,7 @@ index fac59f3..34ce40c 100644
 +	susfs_spoof_uname(&tmp);
 +#endif
  	up_read(&uts_sem);
- 
- #ifdef CONFIG_FAKE_UNAME_ZYGOTE
+ 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 @@ -1416,6 +1419,9 @@ SYSCALL_DEFINE1(uname, struct old_utsname __user *, name)
  
  	down_read(&uts_sem);
