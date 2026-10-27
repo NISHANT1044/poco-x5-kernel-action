@@ -30,6 +30,28 @@ if [ -f "${KERNEL_DIR}/include/linux/typecheck.h" ]; then
 	sed -i 's/__dummy2 = {};/__dummy2;/g' "${KERNEL_DIR}/include/linux/typecheck.h"
 fi
 
+if [ -f "${KERNEL_DIR}/include/linux/workqueue.h" ]; then
+	info "Adding create_singlethread_power_efficient_workqueue to include/linux/workqueue.h"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+if "create_singlethread_power_efficient_workqueue" not in c:
+    macro = """
+#ifndef create_singlethread_power_efficient_workqueue
+#define create_singlethread_power_efficient_workqueue(name) \\
+        alloc_ordered_workqueue("%s", __WQ_LEGACY | WQ_MEM_RECLAIM | \\
+                                WQ_POWER_EFFICIENT, name)
+#endif
+"""
+    c = c.replace("#define create_singlethread_workqueue(name)", macro + "\n#define create_singlethread_workqueue(name)")
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched workqueue.h for Qualcomm dataipa power efficient workqueue")
+' "${KERNEL_DIR}/include/linux/workqueue.h"
+fi
+
 if [ -f "${KERNEL_DIR}/fs/exec.c" ]; then
 	info "Adding fallback weak stub for ksu_handle_post_execveat in fs/exec.c"
 	python3 -c '
@@ -47,12 +69,47 @@ with open(p, "w") as f:
 ' "${KERNEL_DIR}/fs/exec.c"
 fi
 
-group "Injecting AMOLED display techpack"
-info "Fetching techpack/display from Fucking-Projekt meme branch..."
-git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/display_src"
+group "Injecting Qualcomm techpacks (display, dataipa, datarmnet)"
+info "Fetching techpacks from Fucking-Projekt meme branch..."
+git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/techpack_src"
+
 rm -rf "${KERNEL_DIR}/techpack/display"
-cp -r "${WORKSPACE}/display_src/techpack/display" "${KERNEL_DIR}/techpack/"
-rm -rf "${WORKSPACE}/display_src"
+cp -r "${WORKSPACE}/techpack_src/techpack/display" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/dataipa"
+cp -r "${WORKSPACE}/techpack_src/techpack/dataipa" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/datarmnet"
+cp -r "${WORKSPACE}/techpack_src/techpack/datarmnet" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/datarmnet-ext"
+cp -r "${WORKSPACE}/techpack_src/techpack/datarmnet-ext" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${WORKSPACE}/techpack_src"
+
+if [ -f "${KERNEL_DIR}/include/linux/netdevice.h" ]; then
+	info "Adding dev_set_threaded stub to include/linux/netdevice.h"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+if "dev_set_threaded" not in c:
+    stub = """
+#ifndef dev_set_threaded
+#define dev_set_threaded dev_set_threaded
+static inline int dev_set_threaded(struct net_device *dev, bool threaded)
+{
+\treturn 0;
+}
+#endif
+"""
+    c = c.replace("#endif\t/* _LINUX_NETDEVICE_H */", stub + "\n#endif\t/* _LINUX_NETDEVICE_H */")
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched netdevice.h with dev_set_threaded stub")
+' "${KERNEL_DIR}/include/linux/netdevice.h"
+fi
 
 if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ]; then
 	info "Restoring stock CodeLinaro msm_atomic.c and msm_kms.h (pre-c7dd4e53)"
@@ -172,7 +229,7 @@ if [ -f "${KERNEL_DIR}/scripts/setlocalversion" ]; then
 	chmod +x "${KERNEL_DIR}/scripts/setlocalversion"
 fi
 
-ok "AMOLED display techpack injected into ${KERNEL_DIR}/techpack/display"
+ok "AMOLED display and Qualcomm IPA techpacks injected into ${KERNEL_DIR}/techpack"
 endgroup
 
 info "Locking kernel version to stock 5.4.289-qgki-g4e27a72000be for HyperOS module compatibility"
