@@ -383,6 +383,15 @@ void __attribute__((weak)) susfs_set_avc_log_spoofing(bool enable) {}
 int __attribute__((weak)) susfs_add_sus_path_loop(void *arg) { return -EOPNOTSUPP; }
 int __attribute__((weak)) susfs_set_i_state_on_external_dir(void *arg, int cmd) { return -EOPNOTSUPP; }
 int __attribute__((weak)) susfs_add_sus_map(void *arg) { return -EOPNOTSUPP; }
+
+bool __attribute__((weak)) susfs_is_current_proc_umounted(void) { return false; }
+void __attribute__((weak)) susfs_set_current_proc_umounted(void) {}
+int __attribute__((weak)) susfs_get_enabled_features(char __user *buf, size_t size) { return 0; }
+
+void try_umount(const char *mnt, bool check_mnt, int flags, uid_t uid);
+void ksu_try_umount(const char *mnt, bool check_mnt, int flags, uid_t uid) {
+\ttry_umount(mnt, check_mnt, flags, uid);
+}
 """
 if "#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>" in c:
     c = c.replace("#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>", "#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>\n" + extra_stubs)
