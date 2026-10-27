@@ -124,15 +124,17 @@ if [ -f "${KERNEL_DIR}/techpack/display/msm/msm_drv.c" ]; then
 	info "Fixing kthread_run_perf_critical -> kthread_run for Linux 5.4 in msm_drv.c"
 	sed -i 's/kthread_run_perf_critical(cpu_perf_mask,/kthread_run(/g' "${KERNEL_DIR}/techpack/display/msm/msm_drv.c"
 fi
-if [ -f "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c" ]; then
-	info "Checking of_graph_is_present for Linux 5.4 in dsi_display.c"
+if [ -f "${KERNEL_DIR}/include/linux/of_graph.h" ]; then
+	info "Adding of_graph_is_present to include/linux/of_graph.h"
 	python3 -c '
 import sys
 p = sys.argv[1]
 with open(p, "r") as f:
     c = f.read()
 if "of_graph_is_present" not in c:
-    patch = """#include <linux/of_graph.h>
+    patch = """
+#ifndef of_graph_is_present
+#define of_graph_is_present of_graph_is_present
 static inline bool of_graph_is_present(const struct device_node *node) {
 \tstruct device_node *ports, *port;
 \tports = of_get_child_by_name(node, "ports");
@@ -142,10 +144,41 @@ static inline bool of_graph_is_present(const struct device_node *node) {
 \tof_node_put(port);
 \treturn !!port;
 }
+#endif
+"""
+    c = c.replace("#endif /* __LINUX_OF_GRAPH_H */", patch + "\n#endif /* __LINUX_OF_GRAPH_H */")
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched of_graph.h with of_graph_is_present")
+' "${KERNEL_DIR}/include/linux/of_graph.h"
+fi
+
+if [ -f "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c" ]; then
+	info "Checking of_graph_is_present for Linux 5.4 in dsi_display.c"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+if "static inline bool of_graph_is_present" not in c:
+    patch = """#include <linux/of_graph.h>
+#ifndef of_graph_is_present
+#define of_graph_is_present of_graph_is_present
+static inline bool of_graph_is_present(const struct device_node *node) {
+\tstruct device_node *ports, *port;
+\tports = of_get_child_by_name(node, "ports");
+\tif (ports) node = ports;
+\tport = of_get_child_by_name(node, "port");
+\tof_node_put(ports);
+\tof_node_put(port);
+\treturn !!port;
+}
+#endif
 """
     c = c.replace("#include <linux/err.h>", "#include <linux/err.h>\n" + patch)
     with open(p, "w") as f:
         f.write(c)
+    print("Patched dsi_display.c with of_graph_is_present")
 ' "${KERNEL_DIR}/techpack/display/msm/dsi/dsi_display.c"
 fi
 
