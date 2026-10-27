@@ -30,6 +30,28 @@ if [ -f "${KERNEL_DIR}/include/linux/typecheck.h" ]; then
 	sed -i 's/__dummy2 = {};/__dummy2;/g' "${KERNEL_DIR}/include/linux/typecheck.h"
 fi
 
+if [ -f "${KERNEL_DIR}/include/linux/workqueue.h" ]; then
+	info "Adding create_singlethread_power_efficient_workqueue to include/linux/workqueue.h"
+	python3 -c '
+import sys
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+if "create_singlethread_power_efficient_workqueue" not in c:
+    macro = """
+#ifndef create_singlethread_power_efficient_workqueue
+#define create_singlethread_power_efficient_workqueue(name) \\
+        alloc_ordered_workqueue("%s", __WQ_LEGACY | WQ_MEM_RECLAIM | \\
+                                WQ_POWER_EFFICIENT, name)
+#endif
+"""
+    c = c.replace("#define create_singlethread_workqueue(name)", macro + "\n#define create_singlethread_workqueue(name)")
+    with open(p, "w") as f:
+        f.write(c)
+    print("Patched workqueue.h for Qualcomm dataipa power efficient workqueue")
+' "${KERNEL_DIR}/include/linux/workqueue.h"
+fi
+
 if [ -f "${KERNEL_DIR}/fs/exec.c" ]; then
 	info "Adding fallback weak stub for ksu_handle_post_execveat in fs/exec.c"
 	python3 -c '

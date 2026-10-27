@@ -336,6 +336,63 @@ print("Patched pkg_observer.c for Linux 5.4")
 ' "${ksu_dir}/kernel/pkg_observer.c"
 	fi
 
+	if [ -f "${ksu_dir}/kernel/core_hook.c" ]; then
+		info "Adapting core_hook.c for Linux 5.4 non-GKI SUSFS v1.5.5"
+		python3 -c '
+import sys, re
+p = sys.argv[1]
+with open(p, "r") as f:
+    c = f.read()
+
+# 1. Guard optional v2 SUSFS commands with #ifdef
+cmds = [
+    "CMD_SUSFS_ADD_SUS_PATH_LOOP",
+    "CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH",
+    "CMD_SUSFS_SET_SDCARD_ROOT_PATH",
+    "CMD_SUSFS_HIDE_SUS_MNTS_FOR_ALL_PROCS",
+    "CMD_SUSFS_UMOUNT_FOR_ZYGOTE_ISO_SERVICE",
+    "CMD_SUSFS_ADD_SUS_MAP",
+    "CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING"
+]
+for cmd in cmds:
+    pattern = rf"(\tif \(arg2 == {cmd}\) \{{[\s\S]*?\x0a\t\}})"
+    match = re.search(pattern, c)
+    if match:
+        block = match.group(1)
+        wrapped = f"#ifdef {cmd}\n{block}\n#endif"
+        c = c.replace(block, wrapped, 1)
+
+# 2. Replace extern declarations with weak stubs
+c = c.replace("extern bool susfs_is_mnt_devname_ksu(struct path *path);", """bool __attribute__((weak)) susfs_is_mnt_devname_ksu(struct path *path) {
+\tif (path && path->mnt && path->mnt->mnt_sb && path->mnt->mnt_sb->s_type) {
+\t\tconst char *fstype = path->mnt->mnt_sb->s_type->name;
+\t\treturn strcmp(fstype, "overlay") == 0;
+\t}
+\treturn false;
+}""")
+
+c = c.replace("extern void susfs_run_sus_path_loop(uid_t uid);", "void __attribute__((weak)) susfs_run_sus_path_loop(uid_t uid) {}")
+c = c.replace("extern bool susfs_hide_sus_mnts_for_all_procs;", "bool __attribute__((weak)) susfs_hide_sus_mnts_for_all_procs = false;")
+c = c.replace("extern void susfs_reorder_mnt_id(void);", "void __attribute__((weak)) susfs_reorder_mnt_id(void) {}")
+c = c.replace("extern bool susfs_is_auto_add_sus_ksu_default_mount_enabled;", "bool __attribute__((weak)) susfs_is_auto_add_sus_ksu_default_mount_enabled = false;")
+c = c.replace("extern bool susfs_is_auto_add_try_umount_for_bind_mount_enabled;", "bool __attribute__((weak)) susfs_is_auto_add_try_umount_for_bind_mount_enabled = false;")
+
+# Also add weak stubs for the functions in the guarded blocks just in case
+extra_stubs = """
+void __attribute__((weak)) susfs_set_avc_log_spoofing(bool enable) {}
+int __attribute__((weak)) susfs_add_sus_path_loop(void *arg) { return -EOPNOTSUPP; }
+int __attribute__((weak)) susfs_set_i_state_on_external_dir(void *arg, int cmd) { return -EOPNOTSUPP; }
+int __attribute__((weak)) susfs_add_sus_map(void *arg) { return -EOPNOTSUPP; }
+"""
+if "#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>" in c:
+    c = c.replace("#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>", "#ifdef CONFIG_KSU_SUSFS\n#include <linux/susfs.h>\n" + extra_stubs)
+
+with open(p, "w") as f:
+    f.write(c)
+print("Patched core_hook.c for SUSFS compatibility")
+' "${ksu_dir}/kernel/core_hook.c"
+	fi
+
 	# --- publish facts the later steps need --------------------------------
 	local count version_label
 	count=$(git -C "$ksu_dir" rev-list --count HEAD 2>/dev/null || echo 0)
