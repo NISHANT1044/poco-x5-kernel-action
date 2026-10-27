@@ -47,7 +47,7 @@ ksu_registry() {
 		# 'next' was renamed to 'legacy' and the default branch is now 'dev'.
 		# Raw URLs containing /next/ only still work via GitHub's rename
 		# redirect, so we address the real branches directly.
-		echo "https://github.com/KernelSU-Next/KernelSU-Next|dev|KernelSU-Next|dev|legacy|-|KernelSU-Next" ;;
+		echo "https://github.com/pershoot/KernelSU-Next|next-susfs|KernelSU-Next|next-susfs|next-susfs|next-susfs|KernelSU-Next" ;;
 	sukisu-ultra)
 		# Repo moved from the personal ShirkNeko account into its own org.
 		# 'main' is the modular v4 tree (KPM, no SUSFS); 'builtin' is the
@@ -121,7 +121,7 @@ ksu_install() {
 	(
 		cd "$KERNEL_DIR"
 		if [ -n "$ref" ]; then
-			fetch_stdout "$setup_url" | bash -s "$ref"
+			fetch_stdout "$setup_url" | bash -s "$ref" "kprobes"
 		else
 			fetch_stdout "$setup_url" | bash
 		fi

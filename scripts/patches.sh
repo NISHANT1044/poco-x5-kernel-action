@@ -139,7 +139,7 @@ open(sys.argv[1], 'w').write(p)
 # Does the selected variant+ref already contain SUSFS?
 susfs_is_bundled() {
 	local bundled=${KSU_SUSFS_BUNDLED_REFS:--} ref=${KSU_REF_RESOLVED:-}
-	[ "$bundled" = "-" ] && return 1
+	# Check declared refs first
 	local r
 	for r in $bundled; do
 		[ "$r" = "$ref" ] && return 0

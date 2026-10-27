@@ -47,18 +47,25 @@ with open(p, "w") as f:
 ' "${KERNEL_DIR}/fs/exec.c"
 fi
 
-if [ -d "${KERNEL_DIR}/techpack/display" ] && [ -d "${KERNEL_DIR}/techpack/dataipa" ]; then
-	info "techpack/display and dataipa already present in stone kernel source; keeping native techpack"
-else
-	group "Injecting AMOLED display techpack"
-	info "Fetching techpack/display from Fucking-Projekt meme branch..."
-	git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/display_src"
-	rm -rf "${KERNEL_DIR}/techpack/display"
-	cp -r "${WORKSPACE}/display_src/techpack/display" "${KERNEL_DIR}/techpack/"
-	rm -rf "${WORKSPACE}/display_src"
-fi
+group "Injecting Qualcomm techpacks (display, dataipa, datarmnet)"
+info "Fetching techpacks from Fucking-Projekt meme branch..."
+git clone -q --depth=1 -b meme https://github.com/Fucking-Projekt/android_kernel_xiaomi_stone "${WORKSPACE}/techpack_src"
 
-if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ] && [ ! -d "${KERNEL_DIR}/techpack/dataipa" ]; then
+rm -rf "${KERNEL_DIR}/techpack/display"
+cp -r "${WORKSPACE}/techpack_src/techpack/display" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/dataipa"
+cp -r "${WORKSPACE}/techpack_src/techpack/dataipa" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/datarmnet"
+cp -r "${WORKSPACE}/techpack_src/techpack/datarmnet" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${KERNEL_DIR}/techpack/datarmnet-ext"
+cp -r "${WORKSPACE}/techpack_src/techpack/datarmnet-ext" "${KERNEL_DIR}/techpack/"
+
+rm -rf "${WORKSPACE}/techpack_src"
+
+if [ -f "${REPO_ROOT}/patches/display/msm_atomic.c" ]; then
 	info "Restoring stock CodeLinaro msm_atomic.c and msm_kms.h (pre-c7dd4e53)"
 	cp -v "${REPO_ROOT}/patches/display/msm_atomic.c" "${KERNEL_DIR}/techpack/display/msm/msm_atomic.c"
 	cp -v "${REPO_ROOT}/patches/display/msm_kms.h"    "${KERNEL_DIR}/techpack/display/msm/msm_kms.h"
